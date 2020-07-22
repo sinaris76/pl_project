@@ -66,7 +66,7 @@
 (define-struct exp-neg (exp))
 (define-struct exp-listmem (exp listmem))
 (define-struct exp-var (var))
-(define-struct make-null ())
+(define-struct exp-null ())
 
 (define myparser
   (parser
@@ -112,7 +112,7 @@
       ((- cexpg) (make-exp-neg $2))
       ((PO expg PC) $2)
       ((POSNUM) $1)
-      ((NULL) make-null)
+      ((NULL) exp-null)
       ((ID) $1)
       ((TRUE) #t)
       ((FALSE) #f)
@@ -140,6 +140,114 @@
     )
    ))
 
+
+;Eval
+
+(define state '(()))
+
+(define result null)
+
+(define (eval stmt)
+  (displayln stmt)
+  (cond [(null? result)
+         (match stmt
+           [(command ucmds) (displayln ucmds)
+                        (cond [(not (empty? ucmds))
+                               (eval (car ucmds)) (eval (make-command (cdr ucmds)))])]
+
+           [(ucmd uc) (displayln uc)
+                      (match uc
+                        [(ucmd-while exp command) (cond [(eval-exp exp) (eval command) (eval stmt)])]
+                        [(ucmd-if exp command1 command2) (if (eval-exp exp) (eval command1) (eval command2))]
+                        [(ucmd-return exp) (set! result (eval-exp exp))]
+                        [(ucmd-assign var exp) (set-var var (eval-exp exp))]
+                        )])])
+  result)
+
+(define (set-var var val)
+  (set! state (cons (cons (list var val) (car state)) (cdr state)))
+  )
+
+(define (eval-exp exp)
+  (displayln exp)
+  (match exp
+     [(exp-uneq op exp1 exp2) (let [(e1 (eval-exp exp1)) (e2 (eval-exp exp2))]
+                                (cond
+                                  [(and (number? e1) (number? e2)) (op e1 e2)]
+                                  [(and (string? e1) (string? e2)) (if (eqv? op >) (string>? e1 e2) (string>? e2 e1))]
+                                  [(and (and (list? e1) (not (empty? e1))) (or (number? e2) (string? e2))) (and (eval-exp (make-exp-uneq op (car e1) e2)) (eval-exp (make-exp-uneq op (cdr e1) e2)))] 
+                                  [(and (and (list? e2) (not (empty? e2))) (or (number? e1) (string? e1))) (and (eval-exp (make-exp-uneq op (car e2) e1)) (eval-exp (make-exp-uneq op (cdr e2) e1)))]
+                                  [else (error "Comparison not implemented or list is empty" e1 e2)]
+                                  ))]
+     [(exp-== exp1 exp2) (let [(e1 (eval-exp exp1)) (e2 (eval-exp exp2))]
+                           (cond
+                             [(and (number? e1) (number? e2)) (= e1 e2)]
+                             [(and (string? e1) (string? e2)) (string? e1 e2)]
+                             [(and (null? e1) (null? e2)) #t]
+                             [(and (boolean? e1) (boolean? e2)) (eqv? e1 e2)]
+                             [(and (list? e1) (list? e2)) (if (xor (empty? e1) (empty? e2)) #f
+                                                              (and (eval-exp (make-exp-== (car e1) (car e2)) (eval-exp (make-exp-== (cdr e1) (cdr e2))))))]
+                             [(and (list? e1) (not (empty? e1))) (and (eval-exp (make-exp-== (car e1) e2)) (eval-exp (make-exp-== (cdr e1) e2)))]
+                             [(list? e2) (eval-exp (make-exp-== e2 e1))]
+                             [else #f]
+                             ))]
+     [(exp-!= exp1 exp2) (not (eval-exp (make-exp-!= exp1 exp2)))]
+     [(exp-operation op exp1 exp2) (let [(e1 (eval-exp exp1)) (e2 (eval-exp exp2))]
+                                      (cond
+                                        [(and (number? e1) (number? e2)) (op e1 e2)]
+                                        [(and (string? e1) (string? e2) (eqv? op +)) (string-append e1 e2)]
+                                        [(and (boolean? e1) (boolean? e2) (eqv? op +)) (or e1 e2)]
+                                        [(and (boolean? e1) (boolean? e2) (eqv? op *)) (and e1 e2)]
+                                        [(and (list? e1) (list? e2) (eqv? op +)) (append e1 e2)]
+                                        [(and (list? e1) (not (empty? e1))) (cons (eval-exp (make-exp-operation op (car e1) e2)) (eval-exp (make-exp-operation op (cdr e1) e2)))]
+                                        [(and (list? e2) (not (empty? e2))) (cons (eval-exp (make-exp-operation op e1 (car e2))) (eval-exp (make-exp-operation op e1 (cdr e2))))]
+                                        [else (error "Unsupported operation or list is empty" exp1 op exp2)]
+     ))]
+     [(exp-neg exp) (let ((e (eval-exp exp)))
+                      (cond
+                        [(number? e) (- e)]
+                        [(boolean? e) (not e)]
+                        [(and (list? e) (not (empty? e))) (cons (eval-exp (make-exp-neg (car e))) (eval-exp (make-exp-neg (cdr e))))]
+                        [else (error "Unsupported negation or list is empty" e)]
+                        ))]
+     [(exp-listmem exp listmem) (let ((e (eval-exp exp)))
+                                  (if (empty? listmem)
+                                      exp
+                                      (if (list? e)
+                                          (if (> (length e) (car listmem))
+                                              (if (< 0 (car listmem))
+                                                  (eval-exp (make-exp-listmem (list-ref e (car listmem)) (cdr listmem)))
+                                                  (error "negative index" (car listmem)))
+                                              (error "index out of range" (car listmem)))
+                                          (error "is not a list" e)))
+                                  )]
+     [(exp-var var) (get-var var)]
+     [else exp]
+     ))
+     
+(define (get-var var)
+  (get-var-state var state)
+  )
+
+(define (get-var-state var state)
+  (if (empty? state)
+      (error "var not defined" var)
+      (if (empty? (car state))
+          (get-var-state var (cdr state))
+          (if (eqv? (caaar state) var)
+              (cadaar state)
+              (get-var-state var (cons (cdar state) (cdr state))))))
+  )
+
+(define (evaluate addr)
+  (define in-port (open-input-file addr))
+  (define lexer1 (lex-it mylexer in-port))
+  (set! result null)
+  (set! state '(()))
+  (define ret-val (let ((parser-res (myparser lexer1))) (eval parser-res)))
+  (close-input-port in-port)
+  ret-val)
+
 (define lex-it (lambda (lexer input) (lambda () (lexer input))))
 (define lexer1 (lex-it mylexer (open-input-string "a = 5;
 l = [\"b\"];
@@ -155,5 +263,5 @@ return l
 ;(lexer1)
 
 ;(displayln "Test Parser")
-;(let ((parser-res (myparser lexer1))) (command-ucmds parser-res))
+(let ((parser-res (myparser lexer1))) (ucmd-ucmd (car (command-ucmds parser-res))))
 
