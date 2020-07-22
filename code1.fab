@@ -1,1 +1,1 @@
-a = 10; b = 1; while a > 1 do a = a - 1; b = b * a end; return b + 1
+a = 10; b = 1; c = [5, 2]; while a > 1 do a = a - 1; b = b * a end; return b + 1

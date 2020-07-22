@@ -89,11 +89,12 @@
      ((WHILE expg DO commandg END) (make-ucmd-while $2 $4))
      )
     (ucmdg-if
-     ((IF expg DO commandg ELSE commandg ENDIF) (make-ucmd-if $2 $4 $6))
+     ((IF expg THEN commandg ELSE commandg ENDIF) (make-ucmd-if $2 $4 $6))
      )
     (ucmdg-ret
      ((RETURN expg) (make-ucmd-return $2))
-     )(ucmdg-assign
+     )
+    (ucmdg-assign
      ((ID = expg) (make-ucmd-assign $1 $3))
      )
      (expg
@@ -113,7 +114,7 @@
       ((PO expg PC) $2)
       ((POSNUM) $1)
       ((NULL) exp-null)
-      ((ID) $1)
+      ((ID) (make-exp-var $1))
       ((TRUE) (make-exp-var #t))
       ((FALSE) #f)
       ((STR) (substring $1 1 (- (string-length $1) 1)))
@@ -164,11 +165,6 @@
                         )])])
   result)
 
-(define (set-var var val)
-  (displayln state)
-  (set! state (cons (cons (list var val) (car state)) (cdr state)))
-  )
-
 (define (eval-exp exp)
   (displayln exp)
   (match exp
@@ -176,8 +172,8 @@
                                 (cond
                                   [(and (number? e1) (number? e2)) (op e1 e2)]
                                   [(and (string? e1) (string? e2)) (if (eqv? op >) (string>? e1 e2) (string>? e2 e1))]
-                                  [(and (and (list? e1) (not (empty? e1))) (or (number? e2) (string? e2))) (and (eval-exp (make-exp-uneq op (car e1) e2)) (eval-exp (make-exp-uneq op (cdr e1) e2)))] 
-                                  [(and (and (list? e2) (not (empty? e2))) (or (number? e1) (string? e1))) (and (eval-exp (make-exp-uneq op (car e2) e1)) (eval-exp (make-exp-uneq op (cdr e2) e1)))]
+                                  [(and (list? e1) (or (number? e2) (string? e2))) (and (eval-exp (make-exp-uneq op (car e1) e2)) (eval-exp (make-exp-uneq op (cdr e1) e2)))] 
+                                  [(and (list? e2) (or (number? e1) (string? e1))) (and (eval-exp (make-exp-uneq op (car e2) e1)) (eval-exp (make-exp-uneq op (cdr e2) e1)))]
                                   [else (error "Comparison not implemented or list is empty" e1 e2)]
                                   ))]
      [(exp-== exp1 exp2) (let [(e1 (eval-exp exp1)) (e2 (eval-exp exp2))]
@@ -188,7 +184,7 @@
                              [(and (boolean? e1) (boolean? e2)) (eqv? e1 e2)]
                              [(and (list? e1) (list? e2)) (if (xor (empty? e1) (empty? e2)) #f
                                                               (and (eval-exp (make-exp-== (car e1) (car e2)) (eval-exp (make-exp-== (cdr e1) (cdr e2))))))]
-                             [(and (list? e1) (not (empty? e1))) (and (eval-exp (make-exp-== (car e1) e2)) (eval-exp (make-exp-== (cdr e1) e2)))]
+                             [(list? e1) (and (eval-exp (make-exp-== (car e1) e2)) (eval-exp (make-exp-== (cdr e1) e2)))]
                              [(list? e2) (eval-exp (make-exp-== e2 e1))]
                              [else #f]
                              ))]
@@ -200,8 +196,8 @@
                                         [(and (boolean? e1) (boolean? e2) (eqv? op +)) (or e1 e2)]
                                         [(and (boolean? e1) (boolean? e2) (eqv? op *)) (and e1 e2)]
                                         [(and (list? e1) (list? e2) (eqv? op +)) (append e1 e2)]
-                                        [(and (list? e1) (not (empty? e1))) (cons (eval-exp (make-exp-operation op (car e1) e2)) (eval-exp (make-exp-operation op (cdr e1) e2)))]
-                                        [(and (list? e2) (not (empty? e2))) (cons (eval-exp (make-exp-operation op e1 (car e2))) (eval-exp (make-exp-operation op e1 (cdr e2))))]
+                                        [(and (list? e1)) (if (empty? e1) e1 (cons (eval-exp (make-exp-operation op (car e1) e2)) (eval-exp (make-exp-operation op (cdr e1) e2))))]
+                                        [(and (list? e2)) (if (empty? e2) e2 (cons (eval-exp (make-exp-operation op e1 (car e2))) (eval-exp (make-exp-operation op e1 (cdr e2)))))]
                                         [else (error "Unsupported operation or list is empty" exp1 op exp2)]
      ))]
      [(exp-neg exp) (let ((e (eval-exp exp)))
@@ -225,21 +221,24 @@
      [(exp-var var) (get-var var)]
      [else exp]
      ))
+
+(define (set-var var val)
+  (set! state (cons (cons (list var val) (car state)) (cdr state)))
+  (displayln state)
+  )
      
 (define (get-var var)
   (get-var-state var state)
   )
 
-(define (get-var-state var state)
-  (displayln state)
-  (if (empty? state)
+(define (get-var-state var st)
+  (if (empty? st)
       (error "var not defined" var)
-      (if (empty? (car state))
-          (get-var-state var (cdr state))
-          (if (eqv? (caaar state) var)
-              (cadaar state)
-              (get-var-state var (cons (cdar state) (cdr state))))))
-  )
+      (if (empty? (car st))
+          (get-var-state var (cdr st))
+          (if (equal? (caaar st) var)
+              (cadaar st)
+              (get-var-state var (cons (cdar st) (cdr st)))))))
 
 (define (evaluate addr)
   (define in-port (open-input-file addr))
@@ -265,5 +264,6 @@ return l
 ;(lexer1)
 
 ;(displayln "Test Parser")
-(let ((parser-res (myparser lexer1))) (ucmd-ucmd (car (command-ucmds parser-res))))
+;(let ((parser-res (myparser lexer1))) (ucmd-ucmd (car (command-ucmds parser-res))))
 
+(evaluate "code4.fab")
