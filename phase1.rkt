@@ -114,7 +114,7 @@
       ((POSNUM) $1)
       ((NULL) exp-null)
       ((ID) $1)
-      ((TRUE) #t)
+      ((TRUE) (make-exp-var #t))
       ((FALSE) #f)
       ((STR) (substring $1 1 (- (string-length $1) 1)))
       ((listg) $1)
@@ -165,6 +165,7 @@
   result)
 
 (define (set-var var val)
+  (displayln state)
   (set! state (cons (cons (list var val) (car state)) (cdr state)))
   )
 
@@ -230,6 +231,7 @@
   )
 
 (define (get-var-state var state)
+  (displayln state)
   (if (empty? state)
       (error "var not defined" var)
       (if (empty? (car state))

@@ -1,0 +1,8 @@
+a = 5;
+l = ["b"];
+while a > 0 do
+	l = "a" + l + "c";
+	l = l + ["b"];
+	a = a - 1
+end;
+return l

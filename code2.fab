@@ -1,0 +1,14 @@
+a = 1679;
+b = 1357;
+while a > 0 do
+	if a > b then
+		c = a;
+		a = b;
+		b = c
+	else
+		c = 0
+	endif;
+	b = b - a
+end;
+return b
+
