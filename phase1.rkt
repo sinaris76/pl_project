@@ -5,6 +5,18 @@
          parser-tools/yacc)
 (provide (all-defined-out))
 
+; env
+(define (empty-env) (lambda(search-var) (error "variable not found." search-var)))
+(define (extend-env saved-val saved-var search-var env) 
+	(lambda (search-var)
+		(if (equal? search-var saved-var) saved-val (apply-env env search-var))
+	)
+)
+(define (apply-env search-var env)
+	(let [(val (env search-var))] (if (thung? val) (eval-exp (thung-exp val) (thung-env val)) val))	
+)
+
+
 (define-lex-abbrevs
   (str (re-: "\"" (re-* (re-~ "\"")) "\""))
   (id-chars (char-range "A" "z"))
@@ -15,7 +27,7 @@
 ; lexer
 
 (define-tokens tokens1 (ID POSNUM STR))
-(define-empty-tokens tokens2 (== != = - + / * WHILE DO END IF THEN ELSE ENDIF NULL FALSE TRUE SEMI COMMA < > PO PC LO LC RETURN EOF))
+(define-empty-tokens tokens2 (== != = - + / * WHILE DO END IF THEN ELSE ENDIF FUNC NULL FALSE TRUE SEMI COMMA < > PO PC LO LC RETURN EOF))
 
 (define mylexer
   (lexer
@@ -50,6 +62,7 @@
    (str (token-STR lexeme))
    (posnumber (token-POSNUM (string->number lexeme)))
    (whitespace (mylexer input-port))
+   ("func" (token-FUNC))
    ))
 
 ; parser
@@ -67,6 +80,10 @@
 (define-struct exp-listmem (exp listmem))
 (define-struct exp-var (var))
 (define-struct exp-null ())
+(define-struct ucmd-assign-func (var body))
+(define-struct ucmd-call-func (name vars))
+(define-struct ucmd-func (vars body))
+(define-struct thung (exp env))
 
 (define myparser
   (parser
@@ -96,6 +113,8 @@
      )
     (ucmdg-assign
      ((ID = expg) (make-ucmd-assign $1 $3))
+     ((ID = funcg) (make-ucmd-assign-func $1 $3))
+     ((ID = callg) (make-ucmd-call-func $1 $3))
      )
      (expg
       ((aexpg) $1)
@@ -137,6 +156,20 @@
      (listmemg
       ((LO expg LC) (list $2))
       ((LO expg LC listmemg) (cons $2 $4))
+      )
+     (funcg
+      ((FUNC PO varsg PC LO commandg LC) (make-ucmd-func $3 $6))
+      )
+     (varsg
+      ((ID) (list $1))
+      ((ID COMMA varsg) (cons $1 $3))
+      )
+      (callg
+       ((ID PO argsg PC) (make-ucmd-call-func $1 $3))
+      )
+      (argsg
+       ((expg) (list $1))
+       ((expg COMMA argsg) (cons $1 $3))
       )
     )
    ))
