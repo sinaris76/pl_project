@@ -5,7 +5,44 @@
          parser-tools/yacc)
 (provide (all-defined-out))
 
+; library
+(define (pow a b)
+  (cond
+    [(equal? b 1) a]
+    [else (* a (pow a (- b 1)))])
+  )
+(define (make_list a b)
+  (if (> 1 a) '() (cons b (make_list (- a 1) b))))
+(define (reverse a)
+  (if (empty? a) '() (append (reverse (cdr a)) (list (car a)))))
+(define (reverse_all l)
+  (cond
+    [(null? l) empty]
+    [(list? l) (append (reverse_all (cdr l)) (cons (reverse_all (car l)) '()))]
+    [else l]
+    ))
+(define (set a index val)
+  (cond [(empty? a) (error "list index bigger than list size")]
+        [(equal? index 0) (cons val (cdr a))]
+        [else (cons (car a) (set (cdr a) (- index 1) val))]))
+(define (merge a b)
+  (cond [(null? a) b]
+        [(null? b) a]
+        [(< (car a) (car b)) (cons (car a) (merge (cdr a) b))]
+        [else (cons (car b) (merge (cdr b) a))]))
+(define (get_last l n)
+  (if (equal? n (length l)) l (get_last (cdr l) n)))
+(define (get_first l n)
+  (if (equal? n (length l)) l (reverse (get_last (reverse l) n)))
+  )
+(define (get_res l n)
+  (if (equal? n 0) l (get_res (cdr l) (- n 1))))
+(define (merge_sort a)
+  (if (< (length a) 2) a (merge (merge_sort (get_first a (floor (/ (length a) 2)))) (merge_sort (get_res a (floor (/ (length a) 2))))))
+)
 ; env
+
+
 (define (empty-env) (lambda(search-var) (error "variable not found." search-var)))
 (define (extend-env saved-val saved-var search-var env) 
 	(lambda (search-var)
