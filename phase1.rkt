@@ -287,9 +287,12 @@
                              [else #f]
                              ))]
      [(exp-!= exp1 exp2) (not (eval-exp (make-exp-!= exp1 exp2) env))]
-     [(exp-operation op exp1 exp2) (let [(e1 (eval-exp exp1 env)) (e2 (eval-exp exp2 env))]
+     [(exp-operation op exp1 exp2) (let [(e1 (eval-exp exp1 env))]
+                                         (cond [(and (number? e1) (eqv? op *)) 0]
+                                               [(and (boolean? e1) (eqv? op *)) #f]
+                                               [else (let [(e2 (eval-exp exp2 env))]
                                       (cond
-                                        [(and (number? e1) (number? e2)) (op e1 e2)]
+                                        [(and (number? e1) (number? e2)) (if (and (eqv? op *) (equal? e1 0)) 0 (op e1 e2))]
                                         [(and (string? e1) (string? e2) (eqv? op +)) (string-append e1 e2)]
                                         [(and (boolean? e1) (boolean? e2) (eqv? op +)) (or e1 e2)]
                                         [(and (boolean? e1) (boolean? e2) (eqv? op *)) (and e1 e2)]
@@ -297,7 +300,7 @@
                                         [(and (list? e1)) (if (empty? e1) e1 (cons (eval-exp (make-exp-operation op (car e1) e2) env) (eval-exp (make-exp-operation op (cdr e1) e2) env)))]
                                         [(and (list? e2)) (if (empty? e2) e2 (cons (eval-exp (make-exp-operation op e1 (car e2)) env) (eval-exp (make-exp-operation op e1 (cdr e2)) env)))]
                                         [else (error "Unsupported operation or list is empty" exp1 op exp2)]
-     ))]
+     ))]))]
      [(exp-neg exp) (let ((e (eval-exp exp env)))
                       (cond
                         [(number? e) (- e)]
