@@ -16,7 +16,7 @@
   )
 
 (define-tokens tokens1 (ID POSNUM STR))
-(define-empty-tokens tokens2 (== != = - + / * WHILE DO END IF THEN ELSE ENDIF FUNC NULL FALSE TRUE SEMI COMMA < > PO PC LO LC KO KC RETURN EOF))
+(define-empty-tokens tokens2 (== != = - + / * WHILE DO END IF THEN ELSE ENDIF FUNC NULL FALSE TRUE SEMI COMMA < > PO PC LO LC RETURN EOF))
 
 (define mylexer
   (lexer
@@ -45,8 +45,6 @@
    (")" (token-PC))
    ("[" (token-LO))
    ("]" (token-LC))
-   ("{" (token-KO))
-   ("}" (token-KC))
    ("return" (token-RETURN))
    ((eof) (token-EOF))
    (id (token-ID lexeme))
@@ -150,7 +148,7 @@
       ((LO expg LC listmemg) (cons $2 $4))
       )
      (funcg
-      ((FUNC PO varsg PC KO commandg KC) (make-ucmd-func $3 $6))
+      ((FUNC PO varsg PC LO commandg LC) (make-ucmd-func $3 $6))
       )
      (varsg
       ((ID) (list $1))
@@ -337,4 +335,4 @@
 ;(displayln "Test Parser")
 ;(let ((parser-res (myparser lexer1))) (ucmd-ucmd (car (command-ucmds parser-res))))
 
-(evaluate "code5.fab")
+(evaluate "code4.fab")
