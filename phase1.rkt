@@ -81,7 +81,7 @@
   (parser
    (start commandg)
    (end EOF)
-   (tokens tokens1 tokens2)
+   (tokens tokens2 tokens1)
    (error void)
    (grammar
     (commandg
@@ -321,19 +321,12 @@
   (apply-env ret-val "return"))
 
 (define lex-it (lambda (lexer input) (lambda () (lexer input))))
-;(define lexer1 (lex-it mylexer (open-input-string "a = 5
-;l = [\"b\"];
-;while a > 0 do
-;	l = \"a\" + l + \"c\";
-;	l = l + [\"b\"];
-;	a = a - 1
-;end;
-;return l
-;")))
+(define lexer1 (lex-it mylexer (open-input-string "b = reverse([2, [2, 5]]);
+return b")))
 ;
 ;(displayln "Test Lexer")
-;(lexer1)
-
+(lexer1)
+(lexer1)(lexer1)(lexer1)(lexer1)(lexer1)(lexer1)(lexer1)(lexer1)(lexer1)(lexer1)(lexer1)
 ;(displayln "Test Parser")
 ;(let ((parser-res (myparser lexer1))) (ucmd-ucmd (car (command-ucmds parser-res))))
 
