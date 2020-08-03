@@ -10,7 +10,7 @@
 ; lexer
 (define-lex-abbrevs
   (str (re-: "\"" (re-* (re-~ "\"")) "\""))
-  (id-chars (char-range "A" "z"))
+  (id-chars (re-or (char-range "A" "Z") (char-range "_" "_") (char-range "a" "z")))
   (id (re-+ id-chars))
   (posnumber (re-or (re-+ (char-range #\0 #\9)) (re-: (re-+ (char-range #\0 #\9)) #\. (re-+ (char-range #\0 #\9)))))            
   )
@@ -81,7 +81,7 @@
   (parser
    (start commandg)
    (end EOF)
-   (tokens tokens2 tokens1)
+   (tokens tokens1 tokens2)
    (error void)
    (grammar
     (commandg
@@ -165,6 +165,9 @@
       )
     )
    ))
+(define (thung-value th)
+  (if (list? th) (map thung-value th) (eval-exp (thung-exp th) (thung-env th))))
+
 
 ; library
 (define (pow a b)
@@ -220,15 +223,20 @@
 
 (define (init-env)
   (extend-list-env '("pow" "make_list" "reverse" "reverse_all" "set" "merge" "merge_sort" "eval")
-               (list (lambda(list) (apply pow list))
-                     (lambda(list) (apply make_list list))
-                     (lambda(list) (apply reverse list))
-                     (lambda(list) (apply reverse_all list))
-                     (lambda(list) (apply set list))
-                     (lambda(list) (apply merge list))
-                     (lambda(list) (apply merge_sort list))
+               (list (lambda(list) (apply pow (map thung-value list)))
+                     (lambda(list) (apply make_list (map thung-value list)))
+                     (lambda(list) (apply reverse (map thung-value list)))
+                     (lambda(list) (apply reverse_all (map thung-value list)))
+                     (lambda(list) (apply set (map thung-value list)))
+                     (lambda(list) (apply merge (map thung-value list)))
+                     (lambda(list) (apply merge_sort (map thung-value list)))
                      (lambda(list) (eval (car list) init-env)))
                (empty-env)))
+
+(define (thung-list l env)
+  (cond [(list? l) (map (lambda (x) (make-thung x env)) l)]
+        [else (make-thung l env)]
+  ))
 
 
 ;Eval
@@ -250,7 +258,7 @@
                         [(ucmd-assign-func var body) (extend-env var (letrec ((f (lambda (call-list)
                                                                                    (apply-env (eval (ucmd-func-body body) (extend-list-env (ucmd-func-vars body) call-list (extend-env var f env))) "return")
                                                                                    ))) f) env)]
-                        [(ucmd-assign-call var call) (extend-env var ((apply-env env (ucmd-call-name call)) (map (lambda (x) (make-thung x env)) (ucmd-call-vars call))) env)]
+                        [(ucmd-assign-call var call) (extend-env var ((apply-env env (ucmd-call-name call)) (map (lambda (x) (thung-list x env)) (ucmd-call-vars call))) env)]
                         [(ucmd-return exp) (extend-env "return" (eval-exp exp env) env)]
                         )])]
         [else env]))
@@ -325,8 +333,7 @@
 return b")))
 ;
 ;(displayln "Test Lexer")
-(lexer1)
-(lexer1)(lexer1)(lexer1)(lexer1)(lexer1)(lexer1)(lexer1)(lexer1)(lexer1)(lexer1)(lexer1)
+;(lexer1)
 ;(displayln "Test Parser")
 ;(let ((parser-res (myparser lexer1))) (ucmd-ucmd (car (command-ucmds parser-res))))
 
