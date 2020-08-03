@@ -16,7 +16,7 @@
   )
 
 (define-tokens tokens1 (ID POSNUM STR))
-(define-empty-tokens tokens2 (== != = - + / * WHILE DO END IF THEN ELSE ENDIF FUNC NULL FALSE TRUE SEMI COMMA < > PO PC LO LC RETURN EOF))
+(define-empty-tokens tokens2 (== != = - + / * WHILE DO END IF THEN ELSE ENDIF FUNC NULL FALSE TRUE SEMI COMMA < > PO PC KO KC LO LC RETURN EOF))
 
 (define mylexer
   (lexer
@@ -34,6 +34,7 @@
    ("then" (token-THEN))
    ("else" (token-ELSE))
    ("endif" (token-ENDIF))
+   ("func" (token-FUNC))
    ("null" (token-NULL))
    ("false" (token-FALSE))
    ("true" (token-TRUE))
@@ -43,6 +44,8 @@
    (">" (token->))
    ("(" (token-PO))
    (")" (token-PC))
+   ("{" (token-KO))
+   ("}" (token-KC))
    ("[" (token-LO))
    ("]" (token-LC))
    ("return" (token-RETURN))
@@ -51,7 +54,6 @@
    (str (token-STR lexeme))
    (posnumber (token-POSNUM (string->number lexeme)))
    (whitespace (mylexer input-port))
-   ("func" (token-FUNC))
    ))
 
 ; parser
@@ -71,7 +73,7 @@
 (define-struct exp-null ())
 (define-struct ucmd-assign-func (var body))
 (define-struct ucmd-assign-call (var call))
-(define-struct ucmd-call-func (name vars))
+(define-struct ucmd-call (name vars))
 (define-struct ucmd-func (vars body))
 (define-struct thung (exp env))
 
@@ -148,14 +150,14 @@
       ((LO expg LC listmemg) (cons $2 $4))
       )
      (funcg
-      ((FUNC PO varsg PC LO commandg LC) (make-ucmd-func $3 $6))
+      ((FUNC PO varsg PC KO commandg KC) (make-ucmd-func $3 $6))
       )
      (varsg
       ((ID) (list $1))
       ((ID COMMA varsg) (cons $1 $3))
       )
-      (callg
-       ((ID PO argsg PC) (make-ucmd-call-func $1 $3))
+     (callg
+       ((ID PO argsg PC) (make-ucmd-call $1 $3))
       )
       (argsg
        ((expg) (list $1))
@@ -248,7 +250,7 @@
                         [(ucmd-assign-func var body) (extend-env var (letrec ((f (lambda (call-list)
                                                                                    (apply-env (eval (ucmd-func-body body) (extend-list-env (ucmd-func-vars body) call-list (extend-env var f env))) "return")
                                                                                    ))) f) env)]
-                        [(ucmd-assign-call var call) (extend-env var ((apply-env env (ucmd-call-func-name call)) (map (lambda (x) (make-thung x env)) (ucmd-call-func-vars call))) env)]
+                        [(ucmd-assign-call var call) (extend-env var ((apply-env env (ucmd-call-name call)) (map (lambda (x) (make-thung x env)) (ucmd-call-vars call))) env)]
                         [(ucmd-return exp) (extend-env "return" (eval-exp exp env) env)]
                         )])]
         [else env]))
@@ -335,4 +337,4 @@
 ;(displayln "Test Parser")
 ;(let ((parser-res (myparser lexer1))) (ucmd-ucmd (car (command-ucmds parser-res))))
 
-(evaluate "code4.fab")
+(evaluate "code5.fab")
