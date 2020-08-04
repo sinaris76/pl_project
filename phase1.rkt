@@ -169,13 +169,6 @@
 (define (thung-value th)
   (if (list? th) (map thung-value th) (if (thung? th) (eval-exp (thung-exp th) (thung-env th)) th)))
 
-(define (eval-all ezp env)
-  (displayln "AAAA")
-  (cond
-    [(null? ezp) '()]
-    [(list? ezp) (cons (eval-exp (car ezp) env) (eval-all (cdr ezp) env))]
-    [else (eval-exp ezp env)]
-    ))
 
 ; library
 (define (pow a b)
@@ -212,6 +205,7 @@
 (define (merge_sort a)
   (if (< (length a) 2) a (merge (merge_sort (get_first a (floor (/ (length a) 2)))) (merge_sort (get_res a (floor (/ (length a) 2))))))
 )
+
 ; env
 
 
@@ -349,7 +343,6 @@
              [else exp])]
     ))
 
-
 (define (evaluate addr)
   (define in-port (open-input-file addr))
   (define lexer1 (lex-it mylexer in-port))
@@ -358,12 +351,5 @@
   (apply-env ret-val "return"))
 
 (define lex-it (lambda (lexer input) (lambda () (lexer input))))
-;(define lexer1 (lex-it mylexer (open-input-string "b = reverse([2, [2, 5]]);
-;return b")))
-;
-;(displayln "Test Lexer")
-;(lexer1)
-;(displayln "Test Parser")
-;(let ((parser-res (myparser lexer1))) (ucmd-ucmd (car (command-ucmds parser-res))))
 
-(evaluate "./all/lazy3.txt")
+(evaluate "code.txt")
