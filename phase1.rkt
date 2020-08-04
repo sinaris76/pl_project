@@ -127,7 +127,7 @@
       ((NULL) exp-null)
       ((ID) (make-exp-var $1))
       ((TRUE) (make-exp-var #t))
-      ((FALSE) #f)
+      ((FALSE)(make-exp-var #f))
       ((STR) (substring $1 1 (- (string-length $1) 1)))
       ((listg) $1)
       ((ID listmemg) (make-exp-listmem (make-exp-var $1) $2))
@@ -168,6 +168,13 @@
 (define (thung-value th)
   (if (list? th) (map thung-value th) (eval-exp (thung-exp th) (thung-env th))))
 
+(define (eval-all ezp env)
+  (displayln "AAAA")
+  (cond
+    [(null? ezp) '()]
+    [(list? ezp) (cons (eval-exp (car ezp) env) (eval-all (cdr ezp) env))]
+    [else (eval-exp ezp env)]
+    ))
 
 ; library
 (define (pow a b)
@@ -243,6 +250,7 @@
 
 (define (eval stmt env)
   (displayln stmt)
+  
   (cond [(eqv? "sinerf" (apply-env env "return"))
          (match stmt
            [(command ucmds) (displayln ucmds)
@@ -263,6 +271,14 @@
                         )])]
         [else env]))
 
+(define (map-bool l b)
+  (if (null? l) '() (cons (or (car l) b) (map-bool (cdr l) b)))
+  )
+
+(define (map-bool-and l b)
+  (if (null? l) '() (cons (and (car l) b) (map-bool-and (cdr l) b)))
+  )
+
 (define (eval-exp exp env)
   (displayln exp)
   (match exp
@@ -281,15 +297,15 @@
                              [(and (null? e1) (null? e2)) #t]
                              [(and (boolean? e1) (boolean? e2)) (eqv? e1 e2)]
                              [(and (list? e1) (list? e2)) (if (xor (empty? e1) (empty? e2)) #f
-                                                              (and (eval-exp (make-exp-== (car e1) (car e2)) (eval-exp (make-exp-== (cdr e1) (cdr e2)) env) env)))]
+                                                              (and (eval-exp (make-exp-== (car e1) (car e2)) env) (eval-exp (make-exp-== (cdr e1) (cdr e2)) env)))]
                              [(list? e1) (and (eval-exp (make-exp-== (car e1) e2) env) (eval-exp (make-exp-== (cdr e1) e2) env))]
                              [(list? e2) (eval-exp (make-exp-== e2 e1) env)]
                              [else #f]
                              ))]
      [(exp-!= exp1 exp2) (not (eval-exp (make-exp-!= exp1 exp2) env))]
      [(exp-operation op exp1 exp2) (let [(e1 (eval-exp exp1 env))]
-                                         (cond [(and (number? e1) (eqv? op *)) 0]
-                                               [(and (boolean? e1) (eqv? op *)) #f]
+                                         (cond [(and (number? e1) (equal? e1 0) (eqv? op *)) 0]
+                                               [(and (boolean? e1) (equal? e1 #f) (eqv? op *)) #f]
                                                [else (let [(e2 (eval-exp exp2 env))]
                                       (cond
                                         [(and (number? e1) (number? e2)) (if (and (eqv? op *) (equal? e1 0)) 0 (op e1 e2))]
@@ -297,6 +313,10 @@
                                         [(and (boolean? e1) (boolean? e2) (eqv? op +)) (or e1 e2)]
                                         [(and (boolean? e1) (boolean? e2) (eqv? op *)) (and e1 e2)]
                                         [(and (list? e1) (list? e2) (eqv? op +)) (append e1 e2)]
+                                        [(and (list? e1) (boolean? e2) (eqv? op +)) (map-bool e1 e2)]
+                                        [(and (list? e2) (boolean? e1) (eqv? op +)) (map-bool e2 e1)]
+                                        [(and (list? e1) (boolean? e2) (eqv? op *)) (map-bool-and e1 e2)]
+                                        [(and (list? e2) (boolean? e1) (eqv? op *)) (map-bool-and e2 e1)]
                                         [(and (list? e1)) (if (empty? e1) e1 (cons (eval-exp (make-exp-operation op (car e1) e2) env) (eval-exp (make-exp-operation op (cdr e1) e2) env)))]
                                         [(and (list? e2)) (if (empty? e2) e2 (cons (eval-exp (make-exp-operation op e1 (car e2)) env) (eval-exp (make-exp-operation op e1 (cdr e2)) env)))]
                                         [else (error "Unsupported operation or list is empty" exp1 op exp2)]
@@ -305,23 +325,27 @@
                       (cond
                         [(number? e) (- e)]
                         [(boolean? e) (not e)]
-                        [(and (list? e) (not (empty? e))) (cons (eval-exp (make-exp-neg (car e)) env) (eval-exp (make-exp-neg (cdr e)) env))]
+                        [(list? e) (if (empty? e) '() (cons (eval-exp (make-exp-neg (car e)) env) (eval-exp (make-exp-neg (cdr e)) env)))]
                         [else (error "Unsupported negation or list is empty" e)]
                         ))]
      [(exp-listmem exp listmem) (let ((e (eval-exp exp env)))
                                   (if (empty? listmem)
                                       exp
                                       (if (list? e)
-                                          (if (> (length e) (car listmem))
-                                              (if (< 0 (car listmem))
-                                                  (eval-exp (make-exp-listmem (list-ref e (car listmem)) (cdr listmem)) env)
-                                                  (error "negative index" (car listmem)))
-                                              (error "index out of range" (car listmem)))
+                                          (let ((first (eval-exp (car listmem) env)))
+                                          (if (> (length e) first)
+                                              (if (<= 0 first)
+                                                  (eval-exp (make-exp-listmem (list-ref e first) (cdr listmem)) env)
+                                                  (error "negative index" first))
+                                              (error "index out of range" first)))
                                           (error "is not a list" e)))
                                   )]
-     [(exp-var var) (apply-env env var)]
-     [else exp]
-     ))
+     [(exp-var var) (if (boolean? var) var (let ((res (apply-env env var))) res))]
+     [else (cond
+             [(null? exp) '()]
+             [(list? exp) (cons (eval-exp (car exp) env) (eval-exp (cdr exp) env))]
+             [else exp])]
+    ))
 
 
 (define (evaluate addr)
@@ -332,12 +356,12 @@
   (apply-env ret-val "return"))
 
 (define lex-it (lambda (lexer input) (lambda () (lexer input))))
-(define lexer1 (lex-it mylexer (open-input-string "b = reverse([2, [2, 5]]);
-return b")))
+;(define lexer1 (lex-it mylexer (open-input-string "b = reverse([2, [2, 5]]);
+;return b")))
 ;
 ;(displayln "Test Lexer")
 ;(lexer1)
 ;(displayln "Test Parser")
 ;(let ((parser-res (myparser lexer1))) (ucmd-ucmd (car (command-ucmds parser-res))))
 
-(evaluate "code5.fab")
+(evaluate "./all/func5.txt")
