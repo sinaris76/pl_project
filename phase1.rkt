@@ -76,6 +76,7 @@
 (define-struct ucmd-call (name vars))
 (define-struct ucmd-func (vars body))
 (define-struct thung (exp env))
+(define-struct exp-func (body vars))
 
 (define myparser
   (parser
@@ -166,7 +167,7 @@
     )
    ))
 (define (thung-value th)
-  (if (list? th) (map thung-value th) (eval-exp (thung-exp th) (thung-env th))))
+  (if (list? th) (map thung-value th) (if (thung? th) (eval-exp (thung-exp th) (thung-env th)) th)))
 
 (define (eval-all ezp env)
   (displayln "AAAA")
@@ -221,7 +222,7 @@
 	)
 )
 (define (apply-env env search-var)
-	(let [(val (env search-var))] (if (thung? val) (eval-exp (thung-exp val) (thung-env val)) val))	
+	(let [(val (env search-var))] (if (thung? val) (eval-exp (thung-exp val) (thung-env val)) (if (list? val) (thung-value val) val)))	
 )
 
 (define (extend-list-env list-var list-val env)
@@ -266,7 +267,7 @@
                         [(ucmd-assign-func var body) (extend-env var (letrec ((f (lambda (call-list)
                                                                                    (apply-env (eval (ucmd-func-body body) (extend-list-env (ucmd-func-vars body) call-list (extend-env var f env))) "return")
                                                                                    ))) f) env)]
-                        [(ucmd-assign-call var call) (extend-env var ((apply-env env (ucmd-call-name call)) (map (lambda (x) (thung-list x env)) (ucmd-call-vars call))) env)]
+                        [(ucmd-assign-call var call) (extend-env var (make-thung (make-exp-func (apply-env env (ucmd-call-name call)) (map (lambda (x) (thung-list x env)) (ucmd-call-vars call))) env) env)]
                         [(ucmd-return exp) (extend-env "return" (eval-exp exp env) env)]
                         )])]
         [else env]))
@@ -341,6 +342,7 @@
                                           (error "is not a list" e)))
                                   )]
      [(exp-var var) (if (boolean? var) var (let ((res (apply-env env var))) res))]
+    [(exp-func body vars) (if (exp-func? body) ((eval-exp body) vars) (body vars))]
      [else (cond
              [(null? exp) '()]
              [(list? exp) (cons (eval-exp (car exp) env) (eval-exp (cdr exp) env))]
@@ -364,4 +366,4 @@
 ;(displayln "Test Parser")
 ;(let ((parser-res (myparser lexer1))) (ucmd-ucmd (car (command-ucmds parser-res))))
 
-(evaluate "./all/func5.txt")
+(evaluate "./all/lazy3.txt")
